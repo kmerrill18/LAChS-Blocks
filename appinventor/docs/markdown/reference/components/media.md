@@ -8,6 +8,7 @@ title: Media
 
 Table of Contents:
 
+* [AltCamera](#AltCamera)
 * [Camcorder](#Camcorder)
 * [Camera](#Camera)
 * [ImagePicker](#ImagePicker)
@@ -18,6 +19,44 @@ Table of Contents:
 * [TextToSpeech](#TextToSpeech)
 * [VideoPlayer](#VideoPlayer)
 * [YandexTranslate](#YandexTranslate)
+
+## AltCamera  {#AltCamera}
+
+![Camera icon](images/camera.png)
+
+ Use a camera component to take a picture on the phone.
+
+ `Camera` is a non-visible component that takes a picture using the device's camera. After the
+ picture is taken, the path to the file on the phone containing the picture is available as an
+ argument to the [`AfterPicture`](#AltCamera.AfterPicture) event. The path can be used, for example, as the
+ [`Picture`](userinterface.html#Image.Picture) property of an [`Image`](userinterface.html3Image)
+ component.
+
+
+
+### Properties  {#AltCamera-Properties}
+
+{:.properties}
+None
+
+
+### Events  {#AltCamera-Events}
+
+{:.events}
+
+{:id="AltCamera.AfterPicture"} AfterPicture(*image*{:.text})
+: Called after the picture is taken. The text argument `image` is the path that can be used to
+ locate the image on the phone.
+
+### Methods  {#AltCamera-Methods}
+
+{:.methods}
+
+{:id="AltCamera.DoNothing" class="method"} <i/> DoNothing(*num*{:.number})
+: Dummy function for testing AppInventor Extension building
+
+{:id="AltCamera.TakePicture" class="method"} <i/> TakePicture()
+: Takes a picture, then raises the [`AfterPicture`](#AltCamera.AfterPicture) event.
 
 ## Camcorder  {#Camcorder}
 
