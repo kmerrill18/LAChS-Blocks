@@ -108,8 +108,8 @@ import redis.clients.jedis.exceptions.JedisNoScriptException;
     iconName = "images/cloudDB.png")
 @UsesPermissions({INTERNET, ACCESS_NETWORK_STATE})
 @UsesLibraries(libraries = "jedis.jar")
-public class CloudDB extends AndroidNonvisibleComponent implements Component,
-  OnClearListener, OnDestroyListener {
+public final class LAChSDB extends CloudDB implements Component,
+ OnClearListener, OnDestroyListener {
   private static final boolean DEBUG = false;
   private static final String LOG_TAG = "CloudDB";
   private boolean importProject = false;
@@ -149,7 +149,7 @@ public class CloudDB extends AndroidNonvisibleComponent implements Component,
     "c4g/VhsxOBi0cQ+azcgOno4uG+GMmIPLHzHxREzGBHNJdmAPx/i9F4BrLunMTA5a\n" +
     "mnkPIAou1Z5jJh5VkpTYghdae9C8x49OhgQ=\n" +
     "-----END CERTIFICATE-----\n";
-
+  
   // We have to include this intermediate certificate because of bugs
   // in older versions of Android
 
@@ -248,29 +248,28 @@ public class CloudDB extends AndroidNonvisibleComponent implements Component,
 
   private ConnectivityManager cm;
 
-  protected static class storedValue {
-    private String tag;
-    private JSONArray  valueList;
-    storedValue(String tag, JSONArray valueList) {
-      this.tag = tag;
-      this.valueList = valueList;
-    }
+  // private static class lachsStoredValue extends storedValue {
+  //   private String tag;
+  //   private JSONArray  valueList;
+  //   private JSONArray purposes;
 
-    public String getTag() {
-      return tag;
-    }
+  //   lachsStoredValue(String tag, JSONArray valueList, JSONArray purposes) {
+  //     super(tag, valueList);
+  //     this.purposes = purposes;
+  //   }
 
-    public JSONArray getValueList() {
-      return valueList;
-    }
-  }
+  //   public JSONArray getPurposes() {
+  //     return purposes;
+  //   }
+  // }
 
   /**
    * Creates a new CloudDB component.
    * @param container the Form that this component is contained in.
    */
-  public CloudDB(ComponentContainer container) {
-    super(container.$form());
+  public LAChSDB(ComponentContainer container) {
+    // Use the CloudDB constructor
+    super(container);
     // We use androidUIHandler when we set up operations that run asynchronously
     // in a separate thread, but which themselves want to cause actions
     // back in the UI thread.  They do this by posting those actions
@@ -285,21 +284,6 @@ public class CloudDB extends AndroidNonvisibleComponent implements Component,
     cm = (ConnectivityManager) form.$context().getSystemService(android.content.Context.CONNECTIVITY_SERVICE);
   }
 
-  /**
-   * Initialize: Do runtime initialization of CloudDB
-   */
-  public void Initialize() {
-    if (DEBUG) {
-      Log.d(LOG_TAG, "Initalize called!");
-    }
-    if (currentListener == null) { // currentListener may still be set
-      startListener();             // in the Companion
-    }
-    form.registerForOnClear(this); // So we are notified when (clear-current-form)
-                                   // is called.
-    form.registerForOnDestroy(this); // close our Redis connections when we are leaving
-  }
-
   private void stopListener() {
     // We do this on the UI thread to make sure it is complete
     // before we repoint the redis server (or port)
@@ -311,27 +295,6 @@ public class CloudDB extends AndroidNonvisibleComponent implements Component,
       currentListener = null;
       listenerRunning = false;
     }
-  }
-
-  /*
-   * onClear() -- Called when (clear-current-form) is invoked
-   *
-   */
-  @Override
-  public void onClear() {
-    shutdown = true;            // Tell the listener to stop trying
-    flushJedis(false);          // to restart
-    if (DEBUG) {
-      Log.d(LOG_TAG, "onClear() called");
-    }
-  }
-
-  @Override
-  public void onDestroy() {
-    if (DEBUG) {
-      Log.d(LOG_TAG, "onDestroy() called");
-    }
-    onClear();
   }
 
   private synchronized void startListener() {
@@ -353,7 +316,7 @@ public class CloudDB extends AndroidNonvisibleComponent implements Component,
           Jedis jedis = getJedis(true);
           if (jedis != null) {
             try {
-              currentListener = new CloudDBJedisListener(CloudDB.this);
+              currentListener = new CloudDBJedisListener(LAChSDB.this);
               jedis.subscribe(currentListener, projectID);
             } catch (Exception e) {
               Log.e(LOG_TAG, "Error in listener thread", e);
@@ -398,163 +361,6 @@ public class CloudDB extends AndroidNonvisibleComponent implements Component,
     t.start();
   }
 
-  @DesignerProperty(editorType = PropertyTypeConstants.PROPERTY_TYPE_STRING,
-    defaultValue = "DEFAULT")
-  public void RedisServer(String servername) {
-    if (servername.equals("DEFAULT")) {
-      if (!useDefault) {
-        useDefault = true;
-        if (defaultRedisServer == null) { // Not setup yet
-          if (DEBUG) {
-            Log.d(LOG_TAG, "RedisServer called before defaultServer (should not happen!)");
-          }
-        } else {
-          redisServer = defaultRedisServer;
-        }
-        flushJedis(true);           // Re-initialize any existing connections
-      }
-    } else {
-      useDefault = false;
-      if (!servername.equals(redisServer)) {
-        redisServer = servername;
-        flushJedis(true);           // Re-initialize any existing connections
-      }
-    }
-  }
-
-  @SimpleProperty(category = PropertyCategory.BEHAVIOR,
-      description = "The Redis Server to use to store data. A setting of \"DEFAULT\" " +
-          "means that the MIT server will be used.")
-  public String RedisServer() {
-    if (redisServer.equals(defaultRedisServer)) {
-      return "DEFAULT";
-    } else {
-      return redisServer;
-    }
-  }
-
-  // This is a non-documented property because it is hidden in the
-  // UI. Its purpose in life is to transmit the default redis server
-  // from the system into the Companion or packaged app. The Default
-  // server is set in appengine-web.xml (the clouddb.server property). It
-  // is sent to the client from the server via the system config call.
-
-  @DesignerProperty(editorType = PropertyTypeConstants.PROPERTY_TYPE_STRING)
-  @SimpleProperty(category = PropertyCategory.BEHAVIOR,
-    description = "The Default Redis Server to use.",
-    userVisible = false)
-  public void DefaultRedisServer(String server) {
-    defaultRedisServer = server;
-    if (useDefault) {
-      redisServer = server;
-    }
-  }
-
-  @DesignerProperty(editorType = PropertyTypeConstants.PROPERTY_TYPE_INTEGER,
-    defaultValue = "6381")
-  public void RedisPort(int port) {
-    if (port != redisPort) {
-      redisPort = port;
-      flushJedis(true);
-    }
-  }
-
-  @SimpleProperty(category = PropertyCategory.BEHAVIOR,
-      description = "The Redis Server port to use. Defaults to 6381")
-  public int RedisPort() {
-    return redisPort;
-  }
-
-  /**
-   * Gets the ProjectID for this CloudDB project.
-   *
-   * @return the ProjectID for this CloudDB project
-   */
-  @SimpleProperty(category = PropertyCategory.BEHAVIOR,
-      description = "Gets the ProjectID for this CloudDB project.")
-  public String ProjectID() {
-    checkProjectIDNotBlank();
-    return projectID;
-  }
-
-  /**
-   * Specifies the ID of this CloudDB project.
-   *
-   * @param id the project ID
-   */
-  @DesignerProperty(editorType = PropertyTypeConstants.PROPERTY_TYPE_STRING,
-      defaultValue = "")
-  public void ProjectID(String id) {
-    if (!projectID.equals(id)) {
-      projectID = id;
-    }
-    if (projectID.equals("")){
-      throw new RuntimeException("CloudDB ProjectID property cannot be blank.");
-    }
-  }
-
-  /**
-   * Specifies the Token Signature of this CloudDB project.
-   *
-   * @param authToken for CloudDB server
-   */
-  @DesignerProperty(editorType = PropertyTypeConstants.PROPERTY_TYPE_STRING,
-          defaultValue = "")
-  public void Token(String authToken) {
-    if (!token.equals(authToken)) {
-      token = authToken;
-    }
-    if (token.equals("")){
-      throw new RuntimeException("CloudDB Token property cannot be blank.");
-    }
-  }
-
-  /**
-   * This field contains the authentication token used to login to the backed Redis server. For the
-   * "DEFAULT" server, do not edit this value, the system will fill it in for you. A system
-   * administrator may also provide a special value to you which can be used to share data between
-   * multiple projects from multiple people. If using your own Redis server, set a password in the
-   * server's config and enter it here.
-   *
-   * @internaldoc
-   * Getter for the authTokenSignature.
-   *
-   * @return the authTokenSignature for this CloudDB project
-   */
-  @SimpleProperty(category = PropertyCategory.BEHAVIOR, userVisible = false,
-          description = "This field contains the authentication token used to login to " +
-              "the backed Redis server. For the \"DEFAULT\" server, do not edit this " +
-              "value, the system will fill it in for you. A system administrator " +
-              "may also provide a special value to you which can be used to share " +
-              "data between multiple projects from multiple people. If using your own " +
-              "Redis server, set a password in the server's config and enter it here.")
-  public String Token() {
-    checkProjectIDNotBlank();
-    return token;
-  }
-
-  /**
-   * Set to `true`{:.logic.block} to use SSL to talk to CloudDB/Redis server. This must be set to
-   * `true`{:.logic.block} for the "DEFAULT" server.
-   *
-   * @param useSSL true if a secure connection should be used for CloudDB
-   */
-  @DesignerProperty(editorType = PropertyTypeConstants.PROPERTY_TYPE_BOOLEAN,
-           defaultValue = "True")
-  public void UseSSL(boolean useSSL) {
-    if (this.useSSL != useSSL) {
-      this.useSSL = useSSL;
-      flushJedis(true);             // Re-initialize any connections
-    }
-  }
-
-  @SimpleProperty(category = PropertyCategory.BEHAVIOR, userVisible = false,
-          description = "Set to true to use SSL to talk to CloudDB/Redis server. " +
-              "This should be set to True for the \"DEFAULT\" server.")
-  public boolean UseSSL() {
-    return useSSL;
-  }
-
   private static final String SET_SUB_SCRIPT =
     "local key = KEYS[1];" +
     "local value = ARGV[1];" +
@@ -576,6 +382,7 @@ public class CloudDB extends AndroidNonvisibleComponent implements Component,
    * @param valueToStore The value to store. Can be any type of value (e.g.
    * number, text, boolean or list).
    */
+  // TODO: modify for lachsdb
   @SimpleFunction(description = "Store a value at a tag.")
   public void StoreValue(final String tag, final Object valueToStore) {
     checkProjectIDNotBlank();
@@ -732,6 +539,7 @@ public class CloudDB extends AndroidNonvisibleComponent implements Component,
    * @param valueIfTagNotThere The value to pass to the event if the tag does
    *                           not exist.
    */
+  // TODO: modify for lachsdb
   @SimpleFunction(description = "Get the Value for a tag, doesn't return the " +
     "value but will cause a GotValue event to fire when the " +
     "value is looked up.")
@@ -767,7 +575,7 @@ public class CloudDB extends AndroidNonvisibleComponent implements Component,
               }
               else {
                 if (DEBUG) {
-                  Log.d(CloudDB.LOG_TAG,"Value retrieved is null");
+                  Log.d(LAChSDB.LOG_TAG,"Value retrieved is null");
                 }
                 value.set(JsonUtil.getJsonRepresentation(valueIfTagNotThere));
               }
@@ -808,52 +616,6 @@ public class CloudDB extends AndroidNonvisibleComponent implements Component,
     }
   }
 
-  /**
-   * Returns `true`{:.logic.block} if we are on the network and will likely be able to connect to
-   * the `CloudDB` server.
-   *
-   * @return true if the network is connected, otherwise false
-   */
-  @SimpleFunction(description = "returns True if we are on the network and will likely " +
-    "be able to connect to the CloudDB server.")
-  public boolean CloudConnected() {
-    NetworkInfo networkInfo = cm.getActiveNetworkInfo();
-    boolean isConnected = networkInfo != null && networkInfo.isConnected();
-    return isConnected;
-  }
-
-  /**
-   * Event triggered by the {@link #RemoveFirstFromList(String)} function. The argument
-   * `value`{:.variable.block} is the object that was the first in the list, and which is now
-   * removed.
-   *
-   * @param value the value removed from the beginning of the list
-   */
-  @SimpleEvent(description = "Event triggered by the \"RemoveFirstFromList\" function. The " +
-    "argument \"value\" is the object that was the first in the list, and which is now " +
-    "removed.")
-  public void FirstRemoved(Object value) {
-    if (DEBUG) {
-      Log.d(CloudDB.LOG_TAG, "FirstRemoved: Value = " + value);
-    }
-    checkProjectIDNotBlank();
-    try {
-      if(value != null && value instanceof String) {
-        value = JsonUtil.getObjectFromJson((String) value, true);
-      }
-    } catch (JSONException e) {
-      Log.e(CloudDB.LOG_TAG,"error while converting to JSON...",e);
-      return;
-    }
-    final Object sValue = value;
-    androidUIHandler.post(new Runnable() {
-        @Override
-        public void run() {
-          EventDispatcher.dispatchEvent(CloudDB.this, "FirstRemoved", sValue);
-        }
-      });
-  }
-
   private static final String POP_FIRST_SCRIPT =
       "local key = KEYS[1];" +
       "local project = ARGV[1];" +
@@ -878,36 +640,6 @@ public class CloudDB extends AndroidNonvisibleComponent implements Component,
       "end";
 
   private static final String POP_FIRST_SCRIPT_SHA1 = "68a7576e7dc283a8162d01e3e7c2d5c4ab3ff7a5";
-
-  /**
-   * Obtain the first element of a list and atomically remove it. If two devices use this function
-   * simultaneously, one will get the first element and the the other will get the second element,
-   * or an error if there is no available element. When the element is available, the
-   * {@link #FirstRemoved(Object)} event will be triggered.
-   *
-   * @param tag the tag to pop the first value from
-   */
-  @SimpleFunction(description = "Return the first element of a list and atomically remove it. " +
-    "If two devices use this function simultaneously, one will get the first element and the " +
-    "the other will get the second element, or an error if there is no available element. " +
-    "When the element is available, the \"FirstRemoved\" event will be triggered.")
-  public void RemoveFirstFromList(final String tag) {
-    checkProjectIDNotBlank();
-
-    final String key = tag;
-
-    background.submit(new Runnable() {
-        public void run() {
-          Jedis jedis = getJedis();
-          try {
-            FirstRemoved(jEval(POP_FIRST_SCRIPT, POP_FIRST_SCRIPT_SHA1, 1, key, projectID));
-          } catch (JedisException e) {
-            CloudDBError(e.getMessage());
-            flushJedis(true);
-          }
-        }
-      });
-  }
 
   private static final String APPEND_SCRIPT =
       "local key = KEYS[1];" +
@@ -936,48 +668,17 @@ public class CloudDB extends AndroidNonvisibleComponent implements Component,
 
   private static final String APPEND_SCRIPT_SHA1 = "d6cc0f65b29878589f00564d52c8654967e9bcf8";
 
-  @SimpleFunction(description = "Append a value to the end of a list atomically. " +
-    "If two devices use this function simultaneously, both will be appended and no " +
-    "data lost.")
-  public void AppendValueToList(final String tag, final Object itemToAdd) {
-    checkProjectIDNotBlank();
-
-    Object itemObject = new Object();
-    try {
-      if(itemToAdd != null) {
-        itemObject = JsonUtil.getJsonRepresentation(itemToAdd);
-      }
-    } catch(JSONException e) {
-      throw new YailRuntimeError("Value failed to convert to JSON.", "JSON Creation Error.");
-    }
-
-    final String item = (String) itemObject;
-    final String key = tag;
-
-    background.submit(new Runnable() {
-        public void run() {
-          Jedis jedis = getJedis();
-          try {
-            jEval(APPEND_SCRIPT, APPEND_SCRIPT_SHA1, 1, key, item, projectID);
-            UpdateDone(key, "AppendValueToList");
-          } catch(JedisException e) {
-            CloudDBError(e.getMessage());
-            flushJedis(true);
-          }
-        }
-      });
-  }
-
   /**
    * Indicates that a {@link #GetValue(String, Object)} request has succeeded.
    *
    * @param value the value that was returned. Can be any type of value
    *              (e.g. number, text, boolean or list).
    */
+  //TODO: modify for lachsdb
   @SimpleEvent
   public void GotValue(String tag, Object value) {
     if (DEBUG) {
-      Log.d(CloudDB.LOG_TAG, "GotValue: tag = " + tag + " value = " + (String) value);
+      Log.d(LAChSDB.LOG_TAG, "GotValue: tag = " + tag + " value = " + (String) value);
     }
     checkProjectIDNotBlank();
 
@@ -1003,158 +704,6 @@ public class CloudDB extends AndroidNonvisibleComponent implements Component,
     EventDispatcher.dispatchEvent(this, "GotValue", tag, value);
   }
 
-  /**
-   * Remove the tag from CloudDB.
-   *
-   * @internaldoc
-   * Asks CloudDB to forget (delete or set to "null") a given tag.
-   *
-   * @param tag The tag to remove
-   */
-  @SimpleFunction(description = "Remove the tag from CloudDB.")
-  public void ClearTag(final String tag) {
-    checkProjectIDNotBlank();
-    background.submit(new Runnable() {
-        public void run() {
-          try {
-            Jedis jedis = getJedis();
-            jedis.del(projectID + ":" + tag);
-            UpdateDone(tag, "ClearTag");
-          } catch (Exception e) {
-            CloudDBError(e.getMessage());
-            flushJedis(true);
-          }
-        }
-      });
-  }
-
-  /**
-   * Indicates that operations that store data to CloudDB have completed.
-   *
-   * @param tag The tag that was altered
-   * @param operation one of "ClearTag", "StoreValue" or "AppendValueToList"
-   */
-  @SimpleEvent
-  public void UpdateDone(final String tag, final String operation) {
-    if (DEBUG) {
-      Log.d(CloudDB.LOG_TAG, "UpdateDone: tag = " + tag + " operations = " + operation);
-    }
-    androidUIHandler.post(new Runnable() {
-        @Override
-        public void run() {
-          EventDispatcher.dispatchEvent(CloudDB.this, "UpdateDone", tag, operation);
-        }
-      });
-  }
-
-
-  /**
-   * Asks `CloudDB` to retrieve all the tags belonging to this project. The
-   * resulting list is returned in the event {@link #TagList(List)}.
-   */
-  @SimpleFunction(description = "Get the list of tags for this application. " +
-      "When complete a \"TagList\" event will be triggered with the list of " +
-      "known tags.")
-  public void GetTagList() {
-    checkProjectIDNotBlank();
-    NetworkInfo networkInfo = cm.getActiveNetworkInfo();
-    boolean isConnected = networkInfo != null && networkInfo.isConnected();
-    if (isConnected) {
-      background.submit(new Runnable() {
-          public void run() {
-
-            Jedis jedis = getJedis();
-            Set<String> value = null;
-            try {
-              value = jedis.keys(projectID + ":*");
-            } catch (JedisException e) {
-              CloudDBError(e.getMessage());
-              flushJedis(true);
-              return;
-            }
-            final List<String> listValue = new ArrayList<String>(value);
-
-            for(int i = 0; i < listValue.size(); i++){
-              listValue.set(i, listValue.get(i).substring((projectID + ":").length()));
-            }
-
-            androidUIHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                  TagList(listValue);
-                }
-              });
-          }
-        });
-    } else {
-      CloudDBError("Not connected to the Internet, cannot list tags");
-    }
-  }
-
-  /**
-   * Event triggered when we have received the list of known tags. Run in response to a call to the
-   * {@link #GetTagList()} function.
-   *
-   * @param value the list of tags that was returned.
-   */
-  @SimpleEvent(description = "Event triggered when we have received the list of known tags. " +
-      "Used with the \"GetTagList\" Function.")
-  public void TagList(List<String> value) {
-    checkProjectIDNotBlank();
-    EventDispatcher.dispatchEvent(this, "TagList", value);
-  }
-
-  /**
-   * Indicates that the data in the CloudDB project has changed. Launches an event with the
-   * `tag`{:.text.block} that has been updated and the `value`{:.variable.block} it now has.
-   *
-   * @param tag the tag that has changed.
-   * @param value the new value of the tag.
-   */
-  @SimpleEvent(description = "Event indicating that CloudDB data has changed for the given tag and value.")
-  public void DataChanged(final String tag, final Object value) {
-    Object tagValue = "";
-    try {
-      if(value != null && value instanceof String) {
-        tagValue = JsonUtil.getObjectFromJson((String) value, true);
-      }
-    } catch(JSONException e) {
-      throw new YailRuntimeError("Value failed to convert from JSON.", "JSON Retrieval Error.");
-    }
-    final Object finalTagValue = tagValue;
-
-    androidUIHandler.post(new Runnable() {
-      public void run() {
-        // Invoke the application's "DataChanged" event handler
-        EventDispatcher.dispatchEvent(CloudDB.this, "DataChanged", tag, finalTagValue);
-      }
-    });
-  }
-
-  /**
-   * Indicates that an error occurred while communicating with the CloudDB Redis server.
-   *
-   * @param message the error message
-   */
-  @SimpleEvent(description = "Indicates that an error occurred while communicating " +
-                   "with the CloudDB Redis server.")
-  public void CloudDBError(final String message) {
-    // Log the error message for advanced developers
-    Log.e(LOG_TAG, message);
-    androidUIHandler.post(new Runnable() {
-        @Override
-        public void run() {
-
-          // Invoke the application's "CloudDBError" event handler
-          boolean dispatched = EventDispatcher.dispatchEvent(CloudDB.this, "CloudDBError", message);
-          if (!dispatched) {
-            // If the handler doesn't exist, then put up our own alert
-            new Notifier(form).ShowAlert("CloudDBError: " + message);
-          }
-        }
-      });
-  }
-
   private void checkProjectIDNotBlank(){
     if (projectID.equals("")){
       throw new RuntimeException("CloudDB ProjectID property cannot be blank.");
@@ -1164,73 +713,7 @@ public class CloudDB extends AndroidNonvisibleComponent implements Component,
     }
   }
 
-  public Form getForm() {
-    return form;
-  }
-
-  public Jedis getJedis(boolean createNew) {
-    if (dead) {                 // If we are dead, we are dead!
-      return null;
-    }
-    Jedis jedis;
-    try {
-      String jToken;            // The token we actually send to CloudDB
-      // If the first character of the token is %, we toss it away
-      // it is used by MockCloudDB.java to determine if the token should
-      // be kept or fetched from the server when needed
-      if (token != null && !token.equals("") && token.substring(0, 1).equals("%")) {
-        jToken = token.substring(1);
-      } else {
-        jToken = token;
-      }
-      if (DEBUG) {
-        Log.d(LOG_TAG, "getJedis(true): Attempting a new connection (createNew = " +
-          createNew + " redisServer = " + redisServer + " redisPort = " +
-          redisPort + " useSSL = " +
-          useSSL);
-      }
-      if (useSSL) {             // Need to create a TrustManager and trust the Comodo
-                                // Root certificate because it isn't present in older
-                                // Android versions
-        ensureSslSockFactory();
-        JedisShardInfo jedisinfo = new JedisShardInfo(redisServer, redisPort,
-          20000 /* connection timeout */, true, SslSockFactory, null, null);
-        jedisinfo.setPassword(jToken);
-        jedis = new Jedis(jedisinfo);
-      } else {
-        JedisShardInfo jedisinfo = new JedisShardInfo(redisServer,
-          redisPort, 20000 /* connection timeout */);
-        jedisinfo.setPassword(jToken);
-        jedis = new Jedis(jedisinfo);
-      }
-      if (DEBUG) {
-        Log.d(LOG_TAG, "getJedis(true): Have new connection.");
-      }
-      if (DEBUG) {
-        Log.d(LOG_TAG, "getJedis(true): Authentication complete.");
-      }
-    } catch (JedisConnectionException e) {
-      Log.e(LOG_TAG, "in getJedis()", e);
-      CloudDBError(e.getMessage());
-      return null;
-    } catch (JedisDataException e) {
-      // This is always an authentication error
-      Log.e(LOG_TAG, "in getJedis()", e);
-      CloudDBError(e.getMessage() + " CloudDB disabled, restart to re-enable.");
-      dead = true;
-      return null;
-    }
-    return jedis;
-  }
-
-  public synchronized Jedis getJedis() {
-    if (INSTANCE == null) {
-      INSTANCE = getJedis(true);
-    }
-    return INSTANCE;
-  }
-
-  /*
+   /*
    * flushJedis -- Flush the singleton jedis connection. This is
    * used when we detect an error from jedis. It is possible that after
    * an error the jedis connection is in an invalid state (or closed) so
@@ -1267,7 +750,7 @@ public class CloudDB extends AndroidNonvisibleComponent implements Component,
     }
   }
 
- /**
+  /**
    * Accepts a file name and returns a Yail List with two
    * elements. the first element is the file's extension (example:
    * jpg, gif, etc.). The second element is the base64 encoded
@@ -1311,24 +794,6 @@ public class CloudDB extends AndroidNonvisibleComponent implements Component,
     String fileName = new File(fullName).getName();
     int dotIndex = fileName.lastIndexOf(".");
     return dotIndex == -1 ? "" : fileName.substring(dotIndex + 1);
-  }
-
-  public ExecutorService getBackground() {
-    return background;
-  }
-
-  public Object jEval(String script, String scriptsha1, int argcount, String... args) throws JedisException {
-    Jedis jedis = getJedis();
-    try {
-      return jedis.evalsha(scriptsha1, argcount, args);
-    } catch (JedisNoScriptException e) {
-      if (DEBUG) {
-        Log.d(LOG_TAG, "Got a JedisNoScriptException for " + scriptsha1);
-      }
-      // This happens if the server doesn't have the script loaded
-      // So we use regular eval, which should then cache the script
-      return jedis.eval(script, argcount, args);
-    }
   }
 
   // We are synchronized because we are called simultaneously from two

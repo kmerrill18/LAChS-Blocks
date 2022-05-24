@@ -10,6 +10,7 @@ Table of Contents:
 
 * [CloudDB](#CloudDB)
 * [File](#File)
+* [LAChSDB](#LAChSDB)
 * [TinyDB](#TinyDB)
 * [TinyWebDB](#TinyWebDB)
 
@@ -239,6 +240,100 @@ Non-visible component for storing and retrieving files. Use this component to wr
 
    Note that this block will overwrite a file if it already exists. If you want to add content
  to an existing file use the [`AppendToFile`](#File.AppendToFile) method.
+
+## LAChSDB  {#LAChSDB}
+
+The `CloudDB` component is a Non-visible component that allows you to store data on a Internet
+ connected database server (using Redis software). This allows the users of your App to share
+ data with each other. By default data will be stored in a server maintained by MIT, however you
+ can setup and run your own server. Set the [`RedisServer`](#LAChSDB.RedisServer) property and
+ [`RedisPort`](#LAChSDB.RedisPort) property to access your own server.
+
+
+
+### Properties  {#LAChSDB-Properties}
+
+{:.properties}
+
+{:id="LAChSDB.DefaultRedisServer" .text .wo .do} *DefaultRedisServer*
+: The Default Redis Server to use.
+
+{:id="LAChSDB.ProjectID" .text .ro} *ProjectID*
+: Gets the ProjectID for this CloudDB project.
+
+{:id="LAChSDB.RedisPort" .number .ro} *RedisPort*
+: The Redis Server port to use. Defaults to 6381
+
+{:id="LAChSDB.RedisServer" .text .ro} *RedisServer*
+: The Redis Server to use to store data. A setting of "DEFAULT" means that the MIT server will be used.
+
+{:id="LAChSDB.Token" .text .ro .do} *Token*
+: This field contains the authentication token used to login to the backed Redis server. For the
+ "DEFAULT" server, do not edit this value, the system will fill it in for you. A system
+ administrator may also provide a special value to you which can be used to share data between
+ multiple projects from multiple people. If using your own Redis server, set a password in the
+ server's config and enter it here.
+
+{:id="LAChSDB.UseSSL" .boolean .ro .do} *UseSSL*
+: Set to true to use SSL to talk to CloudDB/Redis server. This should be set to True for the "DEFAULT" server.
+
+### Events  {#LAChSDB-Events}
+
+{:.events}
+
+{:id="LAChSDB.CloudDBError"} CloudDBError(*message*{:.text})
+: Indicates that an error occurred while communicating with the CloudDB Redis server.
+
+{:id="LAChSDB.DataChanged"} DataChanged(*tag*{:.text},*value*{:.any})
+: Indicates that the data in the CloudDB project has changed. Launches an event with the
+ `tag`{:.text.block} that has been updated and the `value`{:.variable.block} it now has.
+
+{:id="LAChSDB.FirstRemoved"} FirstRemoved(*value*{:.any})
+: Event triggered by the [`RemoveFirstFromList`](#LAChSDB.RemoveFirstFromList) function. The argument
+ `value`{:.variable.block} is the object that was the first in the list, and which is now
+ removed.
+
+{:id="LAChSDB.GotValue"} GotValue(*tag*{:.text},*value*{:.any})
+: Indicates that a [`GetValue`](#LAChSDB.GetValue) request has succeeded.
+
+{:id="LAChSDB.TagList"} TagList(*value*{:.list})
+: Event triggered when we have received the list of known tags. Run in response to a call to the
+ [`GetTagList`](#LAChSDB.GetTagList) function.
+
+{:id="LAChSDB.UpdateDone"} UpdateDone(*tag*{:.text},*operation*{:.text})
+: Indicates that operations that store data to CloudDB have completed.
+
+### Methods  {#LAChSDB-Methods}
+
+{:.methods}
+
+{:id="LAChSDB.AppendValueToList" class="method"} <i/> AppendValueToList(*tag*{:.text},*itemToAdd*{:.any})
+: Append a value to the end of a list atomically. If two devices use this function simultaneously, both will be appended and no data lost.
+
+{:id="LAChSDB.ClearTag" class="method"} <i/> ClearTag(*tag*{:.text})
+: Remove the tag from CloudDB.
+
+{:id="LAChSDB.CloudConnected" class="method returns boolean"} <i/> CloudConnected()
+: Returns `true`{:.logic.block} if we are on the network and will likely be able to connect to
+ the `CloudDB` server.
+
+{:id="LAChSDB.GetTagList" class="method"} <i/> GetTagList()
+: Asks `CloudDB` to retrieve all the tags belonging to this project. The
+ resulting list is returned in the event [`TagList`](#LAChSDB.TagList).
+
+{:id="LAChSDB.GetValue" class="method"} <i/> GetValue(*tag*{:.text},*valueIfTagNotThere*{:.any})
+: `GetValue` asks `CloudDB` to get the value stored under the given tag.
+ It will pass the result to the [`GotValue`](#LAChSDB.GotValue) will be given.
+
+{:id="LAChSDB.RemoveFirstFromList" class="method"} <i/> RemoveFirstFromList(*tag*{:.text})
+: Obtain the first element of a list and atomically remove it. If two devices use this function
+ simultaneously, one will get the first element and the the other will get the second element,
+ or an error if there is no available element. When the element is available, the
+ [`FirstRemoved`](#LAChSDB.FirstRemoved) event will be triggered.
+
+{:id="LAChSDB.StoreValue" class="method"} <i/> StoreValue(*tag*{:.text},*valueToStore*{:.any})
+: Asks `CloudDB` to store the given `value`{:.variable.block} under the given
+ `tag`{:.text.block}.
 
 ## TinyDB  {#TinyDB}
 
