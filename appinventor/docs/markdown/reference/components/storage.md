@@ -331,9 +331,9 @@ The `CloudDB` component is a Non-visible component that allows you to store data
  or an error if there is no available element. When the element is available, the
  [`FirstRemoved`](#LAChSDB.FirstRemoved) event will be triggered.
 
-{:id="LAChSDB.StoreValue" class="method"} <i/> StoreValue(*tag*{:.text},*valueToStore*{:.any})
+{:id="LAChSDB.StoreValue" class="method"} <i/> StoreValue(*tag*{:.text},*valueToStore*{:.any},*purposeList*{:.any})
 : Asks `CloudDB` to store the given `value`{:.variable.block} under the given
- `tag`{:.text.block}.
+ `tag`{:.text.block} with purposes `purposeList`{:.variable.block}.
 
 ## TinyDB  {#TinyDB}
 

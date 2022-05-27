@@ -249,8 +249,8 @@ public class CloudDB extends AndroidNonvisibleComponent implements Component,
   private ConnectivityManager cm;
 
   protected static class storedValue {
-    private String tag;
-    private JSONArray  valueList;
+    protected String tag;
+    protected JSONArray  valueList;
     storedValue(String tag, JSONArray valueList) {
       this.tag = tag;
       this.valueList = valueList;

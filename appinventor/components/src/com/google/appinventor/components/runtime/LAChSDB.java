@@ -1,3 +1,7 @@
+// ATTEMPT AT EXTENDING CloudDB to make a new component and use imported classes
+// ISSUE: can't add new parameters for some reason
+    // Also can't add new params to the CloudDB class - not about inheritance
+
 // -*- mode: java; c-basic-offset: 2; -*-
 // Copyright 2017-2020 MIT, All rights reserved
 // Released under the Apache License, Version 2.0
@@ -249,9 +253,9 @@ public final class LAChSDB extends CloudDB implements Component,
   private ConnectivityManager cm;
 
   // private static class lachsStoredValue extends storedValue {
-  //   private String tag;
-  //   private JSONArray  valueList;
-  //   private JSONArray purposes;
+  //   // private String tag;
+  //   // private JSONArray  valueList;
+  //   protected JSONArray purposes;
 
   //   lachsStoredValue(String tag, JSONArray valueList, JSONArray purposes) {
   //     super(tag, valueList);
@@ -376,17 +380,18 @@ public final class LAChSDB extends CloudDB implements Component,
 
   /**
    * Asks `CloudDB` to store the given `value`{:.variable.block} under the given
-   * `tag`{:.text.block}.
+   * `tag`{:.text.block} with purposes `purposeList`{:.variable.block}.
    *
    * @param tag The tag to use
    * @param valueToStore The value to store. Can be any type of value (e.g.
    * number, text, boolean or list).
+   * @param purposeList The purposes for which stored data can be used
    */
-  // TODO: modify for lachsdb
-  @SimpleFunction(description = "Store a value at a tag.")
-  public void StoreValue(final String tag, final Object valueToStore) {
+  @SimpleFunction(description = "Store a value at a tag with given purposes.")
+  public void StoreValue(final String tag, final Object valueToStore, Object purposeList) {
     checkProjectIDNotBlank();
     final String value;
+    //final String purposes;
     NetworkInfo networkInfo = cm.getActiveNetworkInfo();
     boolean isConnected = networkInfo != null && networkInfo.isConnected();
 
@@ -404,6 +409,21 @@ public final class LAChSDB extends CloudDB implements Component,
     } catch(JSONException e) {
       throw new YailRuntimeError("Value failed to convert to JSON.", "JSON Creation Error.");
     }
+
+    // try {
+    //   if (purposeList != null) {
+    //     String strval = purposeList.toString();
+    //     if (strval.startsWith("file:///") || strval.startsWith("/storage")) {
+    //       purposes = JsonUtil.getJsonRepresentation(readFile(strval));
+    //     } else {
+    //       purposes = JsonUtil.getJsonRepresentation(purposeList);
+    //     }
+    //   } else {
+    //     purposes = "";
+    //   }
+    // } catch(JSONException e) {
+    //   throw new YailRuntimeError("Purposes failed to convert to JSON.", "JSON Creation Error.");
+    // }
 
     if (isConnected) {
       if (DEBUG) {
@@ -427,6 +447,13 @@ public final class LAChSDB extends CloudDB implements Component,
         } catch (JSONException e) {
           throw new YailRuntimeError("JSON Error putting value.", "value is not convertable");
         }
+        // Add the listed purposes as part of the stored value
+        // try {
+        //   valueList.put(1, purposes);
+        // } catch (JSONException e) {
+        //   throw new YailRuntimeError("JSON Error putting value.", "value is not convertable");
+        // }
+
         storedValue work  = new storedValue(tag, valueList);
         storeQueue.add(work);
         if (kickit) {
@@ -539,11 +566,11 @@ public final class LAChSDB extends CloudDB implements Component,
    * @param valueIfTagNotThere The value to pass to the event if the tag does
    *                           not exist.
    */
-  // TODO: modify for lachsdb
+  // TODO: pull out purpose, check, return just value
   @SimpleFunction(description = "Get the Value for a tag, doesn't return the " +
     "value but will cause a GotValue event to fire when the " +
     "value is looked up.")
-  public void GetValue(final String tag, final Object valueIfTagNotThere) {
+  public void GetValue(final String tag, final Object valueIfTagNotThere/*, final Object purpose*/) {
     if (DEBUG) {
       Log.d(LOG_TAG, "getting value ... for tag: " + tag);
     }
